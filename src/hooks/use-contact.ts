@@ -1,5 +1,4 @@
 import { useMutation } from "@tanstack/react-query";
-import { init, send } from "@emailjs/browser";
 import { z } from "zod";
 
 export const contactSchema = z.object({
@@ -10,52 +9,47 @@ export const contactSchema = z.object({
 
 export type ContactInput = z.infer<typeof contactSchema>;
 
-const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID as string;
-const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID as string;
-const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY as string;
-const TO_EMAIL = import.meta.env.VITE_EMAILJS_TO_EMAIL as string;
-
-if (typeof window !== "undefined" && SERVICE_ID && PUBLIC_KEY) {
-  init(PUBLIC_KEY);
-}
-
-const isEmailJsConfigured = Boolean(SERVICE_ID && TEMPLATE_ID && PUBLIC_KEY && TO_EMAIL);
+const FORMSPREE_FORM_ID =import.meta.env.VITE_FORMSPREE_FORM_ID || "mdawjdga";
+const FORMSPREE_ENDPOINT =   FORMSPREE_FORM_ID
+  ? `https://formspree.io/f/${FORMSPREE_FORM_ID}`
+  : "";
 
 export function useSubmitContact() {
   return useMutation({
     mutationFn: async (data: ContactInput) => {
-      if (!isEmailJsConfigured) {
-        const msg =
-          "EmailJS is not configured. Create a .env with VITE_EMAILJS_SERVICE_ID, VITE_EMAILJS_TEMPLATE_ID, VITE_EMAILJS_PUBLIC_KEY, and VITE_EMAILJS_TO_EMAIL.";
-        console.error(msg);
-        throw new Error(msg);
-      }
-
-      const templateParams = {
-        name: data.name,
-        email: data.email,
-        reply_to: data.email,
-        to_email: TO_EMAIL,
-        subject: `New message from ${data.name}`,
-        message: data.message,
-      };
-
-      try {
-        await send(SERVICE_ID, TEMPLATE_ID, templateParams);
-        return { success: true, message: "Message sent successfully!" };
-      } catch (error) {
-        // EmailJS returns a 400 for invalid payload / missing template vars.
-        // Surface the response body where possible to help diagnose template config.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const err = error as any;
-        console.error("EmailJS send failed", err);
-        if (err?.status === 400 && err?.text) {
-          console.error("EmailJS response body:", err.text);
+      if (!FORMSPREE_FORM_ID) {
+        // Fallback for git/published use: open mail client when Formspree env isn't provided.
+        if (typeof window !== "undefined") {
+          const subject = encodeURIComponent(`New message from ${data.name}`);
+          const body = encodeURIComponent(`Name: ${data.name}\nEmail: ${data.email}\n\n${data.message}`);
+          window.location.href = `mailto:ramapujitha.a616@gmail.com?subject=${subject}&body=${body}`;
         }
-        throw new Error(
-          "EmailJS request failed. Check console for details and verify your template variables match the payload."
-        );
+        return { success: true, fallback: true };
       }
+
+      const response = await fetch(FORMSPREE_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email,
+          message: data.message,
+          _subject: `New message from ${data.name}`,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        const message = result.error || "Failed to send message via Formspree.";
+        console.error("Formspree error", result);
+        throw new Error(message);
+      }
+
+      return result;
     },
   });
 }
