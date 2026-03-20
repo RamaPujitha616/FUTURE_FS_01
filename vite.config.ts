@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -15,8 +16,10 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: true,
   },
+   base: "/FUTURE_FS_01/",
   server: {
     port: 5173,
     host: "0.0.0.0",
   },
 });
+
