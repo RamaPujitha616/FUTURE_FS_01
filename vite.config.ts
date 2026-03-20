@@ -16,7 +16,7 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: true,
   },
-   base: "/FUTURE_FS_01/",
+   
   server: {
     port: 5173,
     host: "0.0.0.0",
